@@ -62,9 +62,9 @@ func main() {
 		w.Write([]byte("Vendor API is running"))
 	}).Methods("GET")
 
-	// Enable CORS for frontend
+	// Enable CORS for frontend - list explicit origins when allowing credentials
 	handler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:3002"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,

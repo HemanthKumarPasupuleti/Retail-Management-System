@@ -30,6 +30,7 @@ function App() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [isBotTyping, setIsBotTyping] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const vendorOptions = useMemo(
     () => vendors.map((v) => ({ value: v.id, label: v.name })),
@@ -174,8 +175,8 @@ function App() {
     setEditingPoId(po.id);
   };
 
-  const handleSendChat = (e) => {
-    e.preventDefault();
+  const handleSendChat = async (e) => {
+    if (e) e.preventDefault();
     const trimmed = chatInput.trim();
     if (!trimmed) return;
     const userMsg = { role: "user", text: trimmed };
@@ -183,11 +184,87 @@ function App() {
     setChatInput("");
     setIsBotTyping(true);
 
+    const t = trimmed.toLowerCase();
+
+    // Greetings
+    if (/^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening)\b/.test(t)) {
+      setTimeout(() => {
+        setChatMessages((prev) => [...prev, { role: "bot", text: "Hello! How can I help you today?" }]);
+        setIsBotTyping(false);
+      }, 400);
+      return;
+    }
+
+    // Create PO command: try to parse inline details
+    const createRegex = /(create|add)\s+(?:a\s+)?(?:po|purchase order)(?:\s+#?(\d+))?(?:.*amount\s+([0-9]+(?:\.[0-9]+)?))?(?:.*vendor\s+([\w\s\-\.]+))?/i;
+    const deleteRegex = /(delete|remove)\s+(?:po|purchase order)(?:\s+#?(\d+))?/i;
+
+    const createMatch = trimmed.match(createRegex);
+    const deleteMatch = trimmed.match(deleteRegex);
+
+    if (createMatch && (createMatch[2] || createMatch[3] || createMatch[4])) {
+      // We have at least some details; attempt to create PO
+      const poNum = createMatch[2] ? Number(createMatch[2]) : undefined;
+      const amount = createMatch[3] ? Number(createMatch[3]) : 0;
+      const vendorName = createMatch[4] ? createMatch[4].trim() : "";
+
+      const payload = { po: poNum || 0, amount: amount || 0, vendor: vendorName || "", status: "Open" };
+      try {
+        const res = await fetch(`${API_URL}/pos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPos((prev) => [data, ...prev]);
+          setChatMessages((prev) => [...prev, { role: "bot", text: `PO created successfully: #${data.po} (id ${data.id})` }]);
+        } else {
+          const err = await res.text();
+          setChatMessages((prev) => [...prev, { role: "bot", text: `Failed to create PO: ${err}` }]);
+        }
+      } catch (err) {
+        setChatMessages((prev) => [...prev, { role: "bot", text: `Error creating PO: ${err.message}` }]);
+      } finally {
+        setIsBotTyping(false);
+      }
+      return;
+    }
+
+    if (deleteMatch && deleteMatch[2]) {
+      const poNumber = deleteMatch[2];
+      // find PO by po number
+      const found = pos.find((p) => String(p.po) === String(poNumber));
+      if (!found) {
+        setTimeout(() => {
+          setChatMessages((prev) => [...prev, { role: "bot", text: `No PO found with number ${poNumber}.` }]);
+          setIsBotTyping(false);
+        }, 400);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/pos/${found.id}`, { method: "DELETE" });
+        if (res.ok) {
+          setPos((prev) => prev.filter((p) => p.id !== found.id));
+          setChatMessages((prev) => [...prev, { role: "bot", text: `PO #${poNumber} deleted.` }]);
+        } else {
+          const err = await res.text();
+          setChatMessages((prev) => [...prev, { role: "bot", text: `Failed to delete PO: ${err}` }]);
+        }
+      } catch (err) {
+        setChatMessages((prev) => [...prev, { role: "bot", text: `Error deleting PO: ${err.message}` }]);
+      } finally {
+        setIsBotTyping(false);
+      }
+      return;
+    }
+
+    // Default informational reply
     setTimeout(() => {
       const reply = getBotReply(trimmed, vendors, pos);
       setChatMessages((prev) => [...prev, { role: "bot", text: reply }]);
       setIsBotTyping(false);
-    }, 500);
+    }, 400);
   };
 
   const getBotReply = (text, vendorList, poList) => {
@@ -271,12 +348,7 @@ function App() {
         >
           Purchase Orders
         </button>
-        <button
-          className={activeTab === "chat" ? "tab active" : "tab"}
-          onClick={() => setActiveTab("chat")}
-        >
-          Assistant
-        </button>
+        {/* Assistant moved to floating icon (bottom-right) */}
       </div>
 
       <main className="content-grid">
@@ -302,7 +374,7 @@ function App() {
                     value={vendorForm.name}
                     onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
                     required
-                    placeholder="Acme Corporation"
+                    placeholder="ex: Hemanth Supplies"
                   />
                 </label>
                 <label>
@@ -311,7 +383,7 @@ function App() {
                     name="address"
                     value={vendorForm.address}
                     onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
-                    placeholder="City, Country"
+                    placeholder="ex: 123 Main Street, Anytown"
                   />
                 </label>
                 <label>
@@ -320,7 +392,7 @@ function App() {
                     name="phone"
                     value={vendorForm.phone}
                     onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
-                    placeholder="+1 555 0100"
+                    placeholder="+91 98765 43210"
                   />
                 </label>
                 <label>
@@ -501,34 +573,42 @@ function App() {
           </section>
         )}
 
-        {activeTab === "chat" && (
-          <section className="card chat-card">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">Assistant</p>
-                <h2>Help & Guidance</h2>
+      {/* Floating assistant button and panel */}
+      {showChat && (
+        <div className="assistant-panel card">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Assistant</p>
+              <h2>Help & Guidance</h2>
+            </div>
+            <div>
+              <button className="ghost-btn" onClick={() => setShowChat(false)}>Close</button>
+            </div>
+          </div>
+
+          <div className="chat-window">
+            {chatMessages.map((m, idx) => (
+              <div key={idx} className={`chat-bubble ${m.role === "user" ? "user" : "bot"}`}>
+                <span>{m.text}</span>
               </div>
-            </div>
+            ))}
+            {isBotTyping && <div className="chat-bubble bot typing">Typing...</div>}
+          </div>
 
-            <div className="chat-window">
-              {chatMessages.map((m, idx) => (
-                <div key={idx} className={`chat-bubble ${m.role === "user" ? "user" : "bot"}`}>
-                  <span>{m.text}</span>
-                </div>
-              ))}
-              {isBotTyping && <div className="chat-bubble bot typing">Typing...</div>}
-            </div>
+          <form className="chat-input-row" onSubmit={handleSendChat}>
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask about vendors or POs..."
+            />
+            <button type="submit" className="primary">Send</button>
+          </form>
+        </div>
+      )}
 
-            <form className="chat-input-row" onSubmit={handleSendChat}>
-              <input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about vendors or POs..."
-              />
-              <button type="submit" className="primary">Send</button>
-            </form>
-          </section>
-        )}
+      <button className="assistant-fab" title="Assistant" onClick={() => setShowChat(true)}>
+        💬
+      </button>
       </main>
     </div>
   );

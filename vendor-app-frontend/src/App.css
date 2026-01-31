@@ -358,3 +358,45 @@ tbody tr:hover {
     flex-direction: column;
   }
 }
+
+/* Floating assistant styles */
+.assistant-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+  border: none;
+  box-shadow: 0 12px 30px rgba(37,99,235,0.28);
+  cursor: pointer;
+  z-index: 1200;
+}
+
+.assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  width: 360px;
+  max-width: calc(100% - 40px);
+  z-index: 1200;
+  padding: 12px;
+}
+
+@media (max-width: 420px) {
+  .assistant-panel {
+    right: 10px;
+    bottom: 76px;
+    width: 320px;
+  }
+  .assistant-fab {
+    right: 10px;
+    bottom: 10px;
+  }
+}
