@@ -1,0 +1,43 @@
+# Go binaries for windows, mac or linux
+vendor-app-backend/vendor-app-backend
+vendor-app-backend/vendor-app-backend.exe
+
+# Go build output
+*.o
+*.a
+*.so
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Go mod and sum files
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Frontend - Node modules
+vendor-app-frontend/node_modules/
+vendor-app-frontend/.npm
+vendor-app-frontend/dist/
+vendor-app-frontend/build/
+
+# React build output
+vendor-app-frontend/.env.local
+vendor-app-frontend/.env.development.local
+vendor-app-frontend/.env.test.local
+vendor-app-frontend/.env.production.local
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
